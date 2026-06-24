@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat</title>
+<script>
+/* ================================================================
+  YOUR CLIENT SETTINGS — EDIT ONLY THIS SECTION
+  Takes 5 minutes per client. Don't touch anything below.
+  ================================================================ */
+
+const CLIENT = {
+
+ // --- BASIC INFO ---
+ businessName:   "SmileCare Dental",
+ tagline:        "Your smile is our priority",
+ phone:          "+919876543210",
+ whatsapp:       "+919876543210",
+ email:          "hello@smilecare.in",
+ website:        "www.smilecare.in",
+ location:       "45, 5th Block, Koramangala, Bangalore - 560095",
+
+ // --- TIMINGS ---
+ timings:        "Mon–Sat: 9am–8pm | Sunday: 10am–2pm | Closed on holidays",
+
+ // --- BRAND COLOR (find hex codes at htmlcolorcodes.com) ---
+ brandColor:     "#2563eb",    // Main color (buttons, header)
+ brandDark:      "#1d4ed8",    // Slightly darker shade
+
+ // --- CHAT WIDGET SETTINGS ---
+ botName:        "SmileCare Assistant",
+ botEmoji:       "🦷",         // Shows in chat header
+ greeting:       "👋 Hi! I'm the SmileCare assistant. I can help with timings, services, prices and booking. How can I help?",
+
+ // --- DISPLAY MODE ---
+ // "widget"  = floating bubble in bottom-right corner (for embedding in client website)
+ // "fullpage" = full page chat (for standalone URL you share directly)
+ displayMode:    "widget",
+
+ // --- YOUR ANTHROPIC API KEY ---
+ // Get free at: console.anthropic.com → API Keys
+ // Cost: ~₹80–400/month for all your clients combined
+ apiKey:         "YOUR_API_KEY_HERE",
+
+ // --- SERVICES & PRICES ---
+ // Add as many lines as needed inside the backticks
+ services: `
+Consultation: ₹200 (free if treatment done same day)
+Dental Cleaning: ₹800–₹1,200
+Tooth Filling: ₹500–₹1,500
+Root Canal Treatment: ₹3,500–₹6,000
+Tooth Extraction: ₹500–₹2,000
+Teeth Whitening: ₹5,000–₹8,000
+Braces / Aligners: ₹25,000–₹80,000
+Dental Implants: ₹25,000–₹45,000 per tooth
+`,
+
+ // --- DOCTORS / STAFF (optional, delete if not needed) ---
+ staff: `
+Dr. Priya Sharma (BDS, MDS) – 12 years experience, cosmetic dentistry specialist
+Dr. Rahul Nair (BDS) – General dentistry
+`,
+
+ // --- EXTRA INFO (parking, insurance, booking, anything else) ---
+ extra: `
+BOOKING APPOINTMENTS:
+Instead of directing customers to call, collect their details through chat.
+When a customer wants to book, ask them these ONE AT A TIME in order:
+1. Full name
+2. Phone number 
+3. Preferred day: Today / Within 2-3 days / This week / This month
+4. Preferred time slot: 11am-1pm / 3pm-5pm / 5pm-8pm / Not sure
+
+Once you have ALL 4 details, say exactly this and nothing else:
+"BOOKING_COMPLETE:name=[their name]|phone=[their phone]|day=[their day choice]|time=[their time choice]"
+
+Do not say anything after BOOKING_COMPLETE line.
+Before collecting details, confirm they want to book with:
+"I'd love to help you book! Let me get a few quick details 😊"
+
+- When customer gives phone number, accept any 10-digit number
+- Do not ask them to add +91 or country code
+- If they give less than 10 digits, politely ask again
+
+`,
+
+ // --- CHATBOT BEHAVIOUR INSTRUCTIONS ---
+ // You can customise how the bot speaks
+ instructions: `
+- Be warm, friendly and helpful
+- Keep replies short — 2 to 4 sentences maximum
+- Always direct bookings to the phone number or WhatsApp
+- If you don't know something, say "Please call us at [phone] for more details"
+- Never give specific medical advice — always say "please consult our doctor"
+- Reply in the same language the user writes in (Hindi, English, Kannada all fine)
+- For pricing questions, give the range and mention consultation for exact quotes
+`,
+ sheetsWebhook:  "https://script.google.com/macros/s/AKfycbw7sD5DfnrThQItJeHiFJ9A2K1PPbuG6m7SS-WtKBUS1JcbKBD1l0tSpoubzzhHgyf5gg/exec",
+ googleSheetUrl: "https://docs.google.com/spreadsheets/d/1gpod4yjqngkRlwwmAWcX9v0FH0ZK-_80-s-F30-JVVo/edit?gid=0#gid=0",
+};
+
+/* ================================================================
+  DO NOT EDIT ANYTHING BELOW THIS LINE
+  ================================================================ */
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+
+/* ---- WIDGET MODE (floating bubble) ---- */
+#chatBubble{position:fixed;bottom:20px;right:20px;width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.2);z-index:9998;transition:transform 0.2s;}
+#chatBubble:hover{transform:scale(1.08);}
+#chatBubble .notif{position:absolute;top:0;right:0;width:14px;height:14px;background:#ef4444;border-radius:50%;border:2px solid white;}
+
+#chatWindow{position:fixed;bottom:84px;right:20px;width:360px;height:520px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.15);z-index:9999;display:none;flex-direction:column;overflow:hidden;transition:opacity 0.2s,transform 0.2s;}
+#chatWindow.open{display:flex;}
+
+/* ---- FULLPAGE MODE ---- */
+body.fullpage{background:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px;}
+body.fullpage #chatWindow{position:static;width:100%;max-width:420px;height:600px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.10);display:flex;}
+body.fullpage #chatBubble{display:none;}
+
+/* ---- SHARED CHAT STYLES ---- */
+.chat-header{padding:14px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.chat-avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.chat-header-info{flex:1;}
+.chat-header-name{color:white;font-weight:600;font-size:14px;}
+.chat-header-status{color:rgba(255,255,255,0.8);font-size:11px;margin-top:1px;}
+.online-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;display:inline-block;margin-right:3px;}
+.close-btn{color:rgba(255,255,255,0.8);background:none;border:none;font-size:18px;cursor:pointer;line-height:1;padding:2px;}
+.close-btn:hover{color:white;}
+
+.messages{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:#f8fafc;scroll-behavior:smooth;}
+.messages::-webkit-scrollbar{width:3px;}
+.messages::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:2px;}
+
+.msg{display:flex;flex-direction:column;max-width:82%;animation:fadeUp 0.2s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:translateY(0);}}
+.msg.bot{align-self:flex-start;}
+.msg.user{align-self:flex-end;}
+.bubble{padding:9px 13px;border-radius:14px;font-size:13px;line-height:1.55;word-break:break-word;}
+.bot .bubble{background:white;color:#1e293b;border:0.5px solid #e2e8f0;border-bottom-left-radius:3px;}
+.user .bubble{color:white;border-bottom-right-radius:3px;}
+.msg-time{font-size:10px;color:#94a3b8;margin-top:3px;padding:0 3px;}
+.user .msg-time{text-align:right;}
+
+.typing-wrap{align-self:flex-start;}
+.typing{display:flex;align-items:center;gap:3px;padding:10px 13px;background:white;border:0.5px solid #e2e8f0;border-radius:14px;border-bottom-left-radius:3px;}
+.typing span{width:6px;height:6px;border-radius:50%;background:#94a3b8;animation:bounce 1.2s infinite;}
+.typing span:nth-child(2){animation-delay:0.2s;}
+.typing span:nth-child(3){animation-delay:0.4s;}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);}30%{transform:translateY(-4px);}}
+
+.input-area{padding:10px 12px;border-top:1px solid #f1f5f9;display:flex;gap:8px;align-items:flex-end;flex-shrink:0;background:white;}
+.input-area textarea{flex:1;border:1.5px solid #e2e8f0;border-radius:10px;padding:9px 12px;font-size:13px;font-family:inherit;resize:none;outline:none;max-height:90px;line-height:1.5;color:#1e293b;background:#f8fafc;transition:border-color 0.15s;}
+.input-area textarea:focus{border-color:var(--bc);background:white;}
+.input-area textarea::placeholder{color:#94a3b8;}
+.send-btn{width:38px;height:38px;border-radius:9px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.15s,transform 0.1s;}
+.send-btn:hover{filter:brightness(0.9);}
+.send-btn:active{transform:scale(0.94);}
+.send-btn:disabled{background:#e2e8f0!important;cursor:not-allowed;}
+.send-btn svg{width:16px;height:16px;fill:white;}
+
+.error-bar{background:#fef2f2;border-top:1px solid #fecaca;color:#dc2626;padding:8px 14px;font-size:12px;display:none;flex-shrink:0;}
+.powered{text-align:center;font-size:10px;color:#cbd5e1;padding:5px;flex-shrink:0;background:white;}
+</style>
+</head>
+<body>
+
+<!-- Floating bubble (widget mode only) -->
+<div id="chatBubble" onclick="toggleChat()">
+ <span id="bubbleEmoji">💬</span>
+ <div class="notif" id="notifDot"></div>
+</div>
+
+<!-- Chat window -->
+<div id="chatWindow">
+ <div class="chat-header" id="chatHeader">
+   <div class="chat-avatar" id="headerEmoji"></div>
+   <div class="chat-header-info">
+     <div class="chat-header-name" id="headerName"></div>
+     <div class="chat-header-status"><span class="online-dot"></span>Online now</div>
+   </div>
+   <button class="close-btn" onclick="toggleChat()" id="closeBtn">✕</button>
+ </div>
+ <div class="messages" id="messages"></div>
+ <div class="error-bar" id="errorBar"></div>
+ <div class="input-area">
+   <textarea id="userInput" placeholder="Type your message..." rows="1"
+     onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+   <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+     <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
+   </button>
+ </div>
+ <div class="powered">Powered by Claude AI</div>
+</div>
+
+<script>
+// Apply brand colors from CLIENT config
+document.documentElement.style.setProperty('--bc', CLIENT.brandColor);
+document.documentElement.style.setProperty('--bd', CLIENT.brandDark);
+
+// Apply to dynamic elements after DOM ready
+window.addEventListener('DOMContentLoaded', () => {
+ document.getElementById('chatHeader').style.background = CLIENT.brandColor;
+ document.getElementById('chatBubble').style.background = CLIENT.brandColor;
+ document.getElementById('headerEmoji').textContent = CLIENT.botEmoji;
+ document.getElementById('bubbleEmoji').textContent = CLIENT.botEmoji;
+ document.getElementById('headerName').textContent = CLIENT.businessName;
+ document.title = CLIENT.businessName + " – Chat";
+
+ document.querySelectorAll('.user .bubble').forEach(b => b.style.background = CLIENT.brandColor);
+ document.querySelectorAll('.send-btn').forEach(b => b.style.background = CLIENT.brandColor);
+
+ if (CLIENT.displayMode === 'fullpage') {
+   document.body.classList.add('fullpage');
+   document.getElementById('chatWindow').classList.add('open');
+   document.getElementById('closeBtn').style.display = 'none';
+ }
+
+ document.getElementById('notifDot').style.display = 'block';
+ addMessage('bot', CLIENT.greeting);
+});
+
+// Build system prompt from CLIENT config
+function buildSystemPrompt() {
+ return `You are a helpful assistant for ${CLIENT.businessName}.
+
+BUSINESS DETAILS:
+Name: ${CLIENT.businessName}
+Phone / WhatsApp: ${CLIENT.phone}
+Email: ${CLIENT.email || 'N/A'}
+Website: ${CLIENT.website || 'N/A'}
+Location: ${CLIENT.location}
+Timings: ${CLIENT.timings}
+
+SERVICES & PRICES:
+${CLIENT.services.trim()}
+
+${CLIENT.staff ? `STAFF / DOCTORS:\n${CLIENT.staff.trim()}\n` : ''}
+ADDITIONAL INFORMATION:
+${CLIENT.extra.trim()}
+
+YOUR INSTRUCTIONS:
+${CLIENT.instructions.trim()}`;
+}
+
+let history = [];
+let isOpen = false;
+
+function toggleChat() {
+ isOpen = !isOpen;
+ const win = document.getElementById('chatWindow');
+ win.classList.toggle('open', isOpen);
+ if (isOpen) {
+   document.getElementById('notifDot').style.display = 'none';
+   document.getElementById('userInput').focus();
+ }
+}
+
+function addMessage(role, text) {
+ const msgs = document.getElementById('messages');
+ const time = new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+ const div = document.createElement('div');
+ div.className = 'msg ' + role;
+ const formatted = text
+   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+   .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+   .replace(/\*(.+?)\*/g, '<em>$1</em>')
+   .replace(/`(.+?)`/g, '<code style="background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:12px;">$1</code>')
+   .replace(/\n/g, '<br>');
+ div.innerHTML = `<div class="bubble" style="${role==='user'?'background:'+CLIENT.brandColor:''}">${formatted}</div>
+   <div class="msg-time">${role==='bot' ? CLIENT.botName+' · ' : ''}${time}</div>`;
+ msgs.appendChild(div);
+ msgs.scrollTop = msgs.scrollHeight;
+}
+
+function showTyping() {
+ const msgs = document.getElementById('messages');
+ const d = document.createElement('div');
+ d.className = 'msg bot typing-wrap'; d.id = 'typing';
+ d.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+ msgs.appendChild(d);
+ msgs.scrollTop = msgs.scrollHeight;
+}
+
+function hideTyping() { const t=document.getElementById('typing'); if(t) t.remove(); }
+function showError(m) { const b=document.getElementById('errorBar'); b.textContent=m; b.style.display='block'; setTimeout(()=>b.style.display='none',5000); }
+
+// ---- GOOGLE SHEETS CONFIG ----
+// Create a new Google Sheet for each client
+// then paste their Apps Script URL here
+const SHEETS_WEBHOOK = CLIENT.sheetsWebhook;
+
+// Sends booking data to Google Sheet
+async function saveBookingToSheet(data) {
+ try {
+   await fetch(SHEETS_WEBHOOK, {
+     method: "POST",
+     headers: { "Content-Type": "application/json" },
+     body: JSON.stringify(data)
+   });
+   console.log("Booking saved to sheet:", data);
+ } catch(e) {
+   console.error("Sheet save failed:", e);
+ }
+}
+
+// Checks Claude/Gemini reply for BOOKING_COMPLETE signal
+// and extracts the booking details
+function extractBooking(reply) {
+ if (!reply.includes("BOOKING_COMPLETE:")) return null;
+ try {
+   const raw = reply.split("BOOKING_COMPLETE:")[1].trim();
+   const parts = {};
+   raw.split("|").forEach(p => {
+     const [key, val] = p.split("=");
+     parts[key.trim()] = val?.trim();
+   });
+
+   // Clean phone number — strip +91, 91, spaces, dashes
+   // so customer can type in any format and it still works
+   if (parts.phone) {
+     parts.phone = parts.phone
+       .replace(/\s+/g, "")      // remove spaces
+       .replace(/-/g, "")         // remove dashes
+       .replace(/^\+91/, "")      // remove +91
+       .replace(/^91(\d{10})$/, "$1"); // remove 91 prefix if 12 digits
+    
+     // Validate — must be exactly 10 digits after cleaning
+     if (!/^\d{10}$/.test(parts.phone)) {
+       parts.phoneWarning = "unverified format";
+     }
+   }
+
+   return parts;
+ } catch(e) {
+   return null;
+ }
+}
+
+async function sendMessage() {
+ const input = document.getElementById('userInput');
+ const text = input.value.trim();
+ if (!text) return;
+ input.value = ''; input.style.height = 'auto';
+ document.getElementById('sendBtn').disabled = true;
+ addMessage('user', text);
+ history.push({role:'user', content:text});
+ showTyping();
+
+ try {
+   const res = await fetch('https://api.anthropic.com/v1/messages', {
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/json',
+       'x-api-key': CLIENT.apiKey,
+       'anthropic-version': '2023-06-01',
+       'anthropic-dangerous-direct-browser-access': 'true'
+     },
+     body: JSON.stringify({
+       model: 'claude-haiku-4-5-20251001',
+       max_tokens: 300,
+       system: buildSystemPrompt(),
+       messages: history
+     })
+   });
+
+   if (!res.ok) {
+     const e = await res.json();
+     showError(res.status===401 ? 'Invalid API key — check CLIENT.apiKey at the top of the file.' : 'Error: '+(e.error?.message||'Please try again.'));
+     history.pop(); hideTyping();
+     document.getElementById('sendBtn').disabled = false;
+     return;
+   }
+
+   const data = await res.json();
+   const reply = data.content[0].text;
+   history.push({role:'assistant', content:reply});
+   hideTyping();
+
+// Check if AI has collected all booking details
+const booking = extractBooking(reply);
+if (booking) {
+ // Save to Google Sheet
+ await saveBookingToSheet({
+   timestamp: new Date().toISOString(),
+   name:      booking.name,
+   phone:     booking.phone,
+   day:       booking.day,
+   time:      booking.time,
+   business:  CLIENT.businessName
+ });
+ // Show friendly confirmation instead of the raw signal
+ addMessage('bot',
+   `✅ Perfect! Your booking request has been recorded.\n\n` +
+   `*Name:* ${booking.name}\n` +
+   `*Phone:* ${booking.phone}\n` +
+   `*Preferred day:* ${booking.day}\n` +
+   `*Preferred time:* ${booking.time}\n\n` +
+   `Our team will confirm your appointment shortly! 😊`
+ );
+} else {
+ addMessage('bot', reply);
+}
+ } catch(e) {
+   hideTyping();
+   showError('Connection error. Check internet and try again.');
+   history.pop();
+ }
+ document.getElementById('sendBtn').disabled = false;
+ document.getElementById('userInput').focus();
+}
+
+function handleKey(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} }
+function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,90)+'px'; }
+</script>
+</body>
+</html>
