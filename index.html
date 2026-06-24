@@ -38,10 +38,7 @@ const CLIENT = {
  // "fullpage" = full page chat (for standalone URL you share directly)
  displayMode:    "widget",
 
- // --- YOUR ANTHROPIC API KEY ---
- // Get free at: console.anthropic.com → API Keys
- // Cost: ~₹80–400/month for all your clients combined
- apiKey:         "GEMINI_KEY",
+ 
 
  // --- SERVICES & PRICES ---
  // Add as many lines as needed inside the backticks
@@ -193,7 +190,7 @@ body.fullpage #chatBubble{display:none;}
      <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
    </button>
  </div>
- <div class="powered">Powered by Claude AI</div>
+ <div class="powered">Powered by AI</div>
 </div>
 
 <script>
@@ -351,32 +348,25 @@ async function sendMessage() {
  showTyping();
 
  try {
-   const res = await fetch('https://api.anthropic.com/v1/messages', {
+   const res = await fetch('/api/chat', {
      method: 'POST',
-     headers: {
-       'Content-Type': 'application/json',
-       'x-api-key': CLIENT.apiKey,
-       'anthropic-version': '2023-06-01',
-       'anthropic-dangerous-direct-browser-access': 'true'
-     },
+     headers: { 'Content-Type': 'application/json' },
      body: JSON.stringify({
-       model: 'claude-haiku-4-5-20251001',
-       max_tokens: 300,
-       system: buildSystemPrompt(),
+       systemPrompt: buildSystemPrompt(),
        messages: history
      })
    });
 
    if (!res.ok) {
      const e = await res.json();
-     showError(res.status===401 ? 'Invalid API key — check CLIENT.apiKey at the top of the file.' : 'Error: '+(e.error?.message||'Please try again.'));
+     showError('Error: ' + (e.error || 'Please try again.'));
      history.pop(); hideTyping();
      document.getElementById('sendBtn').disabled = false;
      return;
    }
 
    const data = await res.json();
-   const reply = data.content[0].text;
+   const reply = data.reply;
    history.push({role:'assistant', content:reply});
    hideTyping();
 
@@ -384,13 +374,18 @@ async function sendMessage() {
 const booking = extractBooking(reply);
 if (booking) {
  // Save to Google Sheet
- await saveBookingToSheet({
-   timestamp: new Date().toISOString(),
-   name:      booking.name,
-   phone:     booking.phone,
-   day:       booking.day,
-   time:      booking.time,
-   business:  CLIENT.businessName
+ await fetch('/api/booking', {
+   method: 'POST',
+   headers: { 'Content-Type': 'application/json' },
+   body: JSON.stringify({
+     sheetsWebhook: CLIENT.sheetsWebhook,
+     timestamp:     new Date().toISOString(),
+     name:          booking.name,
+     phone:         booking.phone,
+     day:           booking.day,
+     time:          booking.time,
+     business:      CLIENT.businessName
+   })
  });
  // Show friendly confirmation instead of the raw signal
  addMessage('bot',
