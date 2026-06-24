@@ -136,25 +136,7 @@ async function handleMessage(event, pageId, platform) {
   await sendSocialReply(senderId, finalReply, platform);
 }
 
-async function sendSocialReply(recipientId, text, platform) {
-  try {
-    await fetch("https://graph.facebook.com/v18.0/me/messages", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        recipient:      { id: recipientId },
-        message:        { text },
-        messaging_type: "RESPONSE"
-      }),
-      // Token in URL for Meta Graph API
-      ...{ search: `?access_token=${process.env.PAGE_ACCESS_TOKEN}` }
-    });
-  } catch(e) {
-    console.error(`Send reply error [${platform}]:`, e.message);
-  }
-}
 
-// Fix: proper fetch with access token as query param
 async function sendSocialReply(recipientId, text, platform) {
   try {
     await fetch(
@@ -181,7 +163,7 @@ async function sendSocialReply(recipientId, text, platform) {
 
 async function callGemini(systemPrompt, messages) {
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${process.env.GEMINI_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_KEY}`,
     {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
