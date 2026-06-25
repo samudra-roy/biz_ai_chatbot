@@ -96,12 +96,12 @@ export default async function handler(req, res) {
 const CLIENTS = {
 
   // Replace with actual Phone Number ID from Meta Dashboard
-  "YOUR_PHONE_NUMBER_ID": {
+  "1167174909818379": {
     name:         "DemoClinic Bangalore",
-    sheetsWebhook: "YOUR_APPS_SCRIPT_URL",
+    sheetsWebhook: "https://script.google.com/macros/s/AKfycbw7sD5DfnrThQItJeHiFJ9A2K1PPbuG6m7SS-WtKBUS1JcbKBD1l0tSpoubzzhHgyf5gg/exec",
     info: `
 You are a WhatsApp assistant for DemoClinic Dental, Bangalore.
-Phone: +91 XXXXX XXXXX
+Phone: +919876543210
 Timings: Mon-Sat 9am-8pm, Sun 10am-2pm
 Services: Cleaning ₹800-1200, Filling ₹500-1500, Root Canal ₹3500-6000
 
