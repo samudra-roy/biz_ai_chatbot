@@ -162,22 +162,58 @@ async function sendSocialReply(recipientId, text, platform) {
    ================================================================ */
 
 async function callGemini(systemPrompt, messages) {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_KEY}`,
-    {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: messages.map(m => ({
-          role:  m.role === "assistant" ? "model" : "user",
-          parts: [{ text: m.content }]
-        }))
-      })
+  const MAX_RETRIES = 3;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_KEY}`,
+        {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          signal:  AbortSignal.timeout(10000),
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: messages.map(m => ({
+              role:  m.role === "assistant" ? "model" : "user",
+              parts: [{ text: m.content }]
+            })),
+            generationConfig: {
+              maxOutputTokens: 300,
+              temperature: 0.7
+            }
+          })
+        }
+      );
+
+      if (response.status === 429) {
+        await sleep(attempt * 1000);
+        lastError = "Rate limited";
+        continue;
+      }
+
+      if (!response.ok) {
+        await sleep(attempt * 800);
+        lastError = "API error";
+        continue;
+      }
+
+      const data  = await response.json();
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!reply) { await sleep(500); continue; }
+      return reply;
+
+    } catch(err) {
+      lastError = err.message;
+      await sleep(attempt * 800);
     }
-  );
-  const data = await response.json();
-  return data.candidates[0].content.parts[0].text;
+  }
+  return "Sorry, I'm having a small issue. Please call us directly 😊";
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function extractBooking(reply) {
